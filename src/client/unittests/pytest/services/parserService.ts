@@ -33,7 +33,7 @@ export class TestsParser implements ITestsParser {
 
         let haveErrors = false;
 
-        let packagePrefix: string = '';
+        const packages: { indent: number; packagePrefix: string }[] = [];
         content.split(/\r?\n/g).forEach((line, index, lines) => {
             if (options.token && options.token.isCancellationRequested) {
                 return;
@@ -41,19 +41,25 @@ export class TestsParser implements ITestsParser {
 
             const trimmedLine: string = line.trim();
 
-            if (trimmedLine.startsWith('<Package ')) {
+            if (trimmedLine.startsWith('<Package ') || trimmedLine.startsWith('<Module ') || index === lines.length - 1) {
+                let packagePrefix : string = '';
+                if (packages.length > 0) {
+                    packagePrefix = packages[packages.length - 1].packagePrefix;
+                }
                 // Process the previous lines.
                 this.parsePyTestModuleCollectionResult(options.cwd, logOutputLines, testFiles, parentNodes, packagePrefix);
+                let indent = line.indexOf('<');
+                while (packages.length > 0 && packages[packages.length - 1].indent >= indent) {
+                    packages.pop();
+                }
                 logOutputLines = [''];
-
+                if (trimmedLine.startsWith('<Package ')) {
+                    indent = line.indexOf('<');
                 packagePrefix = this.extractPackageName(trimmedLine, options.cwd);
+                    packages.push({indent: indent, packagePrefix: packagePrefix});
+                }
             }
 
-            if (trimmedLine.startsWith('<Module ') || index === lines.length - 1) {
-                // Process the previous lines.
-                this.parsePyTestModuleCollectionResult(options.cwd, logOutputLines, testFiles, parentNodes, packagePrefix);
-                logOutputLines = [''];
-            }
             if (errorLine.test(line)) {
                 haveErrors = true;
                 logOutputLines = [''];
@@ -292,37 +298,37 @@ export class TestsParser implements ITestsParser {
     }
 }
 
-/* Sample output from pytest --collect-only
-<Module 'test_another.py'>
-  <Class 'Test_CheckMyApp'>
-    <Instance '()'>
-      <Function 'test_simple_check'>
-      <Function 'test_complex_check'>
-<Module 'test_one.py'>
-  <UnitTestCase 'Test_test1'>
-    <TestCaseFunction 'test_A'>
-    <TestCaseFunction 'test_B'>
-<Module 'test_two.py'>
-  <UnitTestCase 'Test_test1'>
-    <TestCaseFunction 'test_A2'>
-    <TestCaseFunction 'test_B2'>
-<Module 'testPasswords/test_Pwd.py'>
-  <UnitTestCase 'Test_Pwd'>
-    <TestCaseFunction 'test_APwd'>
-    <TestCaseFunction 'test_BPwd'>
-<Module 'testPasswords/test_multi.py'>
-  <Class 'Test_CheckMyApp'>
-    <Instance '()'>
-      <Function 'test_simple_check'>
-      <Function 'test_complex_check'>
-      <Class 'Test_NestedClassA'>
+    /* Sample output from pytest --collect-only
+    <Module 'test_another.py'>
+      <Class 'Test_CheckMyApp'>
         <Instance '()'>
-          <Function 'test_nested_class_methodB'>
-          <Class 'Test_nested_classB_Of_A'>
+          <Function 'test_simple_check'>
+          <Function 'test_complex_check'>
+    <Module 'test_one.py'>
+      <UnitTestCase 'Test_test1'>
+        <TestCaseFunction 'test_A'>
+        <TestCaseFunction 'test_B'>
+    <Module 'test_two.py'>
+      <UnitTestCase 'Test_test1'>
+        <TestCaseFunction 'test_A2'>
+        <TestCaseFunction 'test_B2'>
+    <Module 'testPasswords/test_Pwd.py'>
+      <UnitTestCase 'Test_Pwd'>
+        <TestCaseFunction 'test_APwd'>
+        <TestCaseFunction 'test_BPwd'>
+    <Module 'testPasswords/test_multi.py'>
+      <Class 'Test_CheckMyApp'>
+        <Instance '()'>
+          <Function 'test_simple_check'>
+          <Function 'test_complex_check'>
+          <Class 'Test_NestedClassA'>
             <Instance '()'>
-              <Function 'test_d'>
-  <Function 'test_username'>
-  <Function 'test_parametrized_username[one]'>
-  <Function 'test_parametrized_username[two]'>
-  <Function 'test_parametrized_username[three]'>
-*/
+              <Function 'test_nested_class_methodB'>
+              <Class 'Test_nested_classB_Of_A'>
+                <Instance '()'>
+                  <Function 'test_d'>
+      <Function 'test_username'>
+      <Function 'test_parametrized_username[one]'>
+      <Function 'test_parametrized_username[two]'>
+      <Function 'test_parametrized_username[three]'>
+    */
